@@ -1,4 +1,5 @@
 package Core;
+import Core.DataModel.DBMethods;
 import Core.DataModel.Definition;
 import Core.DataModel.Word;
 import com.j256.ormlite.dao.Dao;
@@ -15,6 +16,8 @@ public class Main {
     public static void main(String[] args) throws SQLException, IOException {
         String databaseUrl = "jdbc:sqlite:vocappulary.db";
 
+        String a = " `\\sasf\"fsf 'f' ";
+        String b = DBMethods.escapeString(a);
         // basically opens a file, throws both SQL and IO exceptions
         ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
 
@@ -35,7 +38,7 @@ public class Main {
         wordDao.create(word);
 
         Definition definition = new Definition();
-        definition.text = "asdasf";
+        definition.text = DBMethods.escapeString("asda\\`\"s'''''f");
         definition.context = "ksjnsdkfn asdasd";
         definition.word = word;
         definitionDao.create(definition);
