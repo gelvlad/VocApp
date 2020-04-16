@@ -1,5 +1,8 @@
 package Core.Data;
 
+import Core.Data.Access.CustomAccess;
+import Core.Data.Access.CustomDefinitionAccess;
+import Core.Data.Access.CustomWordAccess;
 import Core.Data.Models.Definition;
 import Core.Data.Models.Word;
 import com.j256.ormlite.dao.Dao;
@@ -11,52 +14,41 @@ import com.j256.ormlite.table.TableUtils;
 import java.io.IOException;
 import java.sql.SQLException;
 
-public class Database implements AutoCloseable {
-    // cause why not
-    private String url;
-
+public class Database {
+    /************* Fields *************/
+    private static String dbUrl;
+    private static ConnectionSource connectionSource;
+    private static CustomAccess<Definition,Long> definitionAccess;
+    private static CustomAccess<Word,Long> wordAccess;
+    /************* Getters *************/
     public String getUrl() {
-        return url;
+        return dbUrl;
     }
-
-
-    private ConnectionSource connectionSource;
-
     public ConnectionSource getConnectionSource() {
         return connectionSource;
     }
-
-    public void createConnectionSource(String url) throws SQLException, IOException {
-        // connection source uses external resources, so we need to properly close it first
-        if (connectionSource != null)
-            connectionSource.close();
+    public static CustomAccess<Definition,Long> getDefinitionAccess() {
+        return definitionAccess;
+    }
+    public static CustomAccess<Word,Long> getWordAccess() {
+        return wordAccess;
+    }
+    /************* Logic *************/
+    public static void init(String url) throws SQLException {
+        dbUrl = url;
         connectionSource = new JdbcConnectionSource(url);
-        this.url = url;
-    }
+        definitionAccess=new CustomDefinitionAccess(connectionSource);
+        wordAccess=new CustomWordAccess(connectionSource);
 
-
-    public Database(String url) throws SQLException {
-        this.connectionSource = new JdbcConnectionSource(url);
-        this.url = url;
-    }
-
-    public void createTables() throws SQLException {
         TableUtils.createTableIfNotExists(connectionSource, Word.class);
         TableUtils.createTableIfNotExists(connectionSource, Definition.class);
     }
-
-    public Dao<Definition, Long> getDefinitionDao() throws SQLException {
-        // DaoManager will check if such DAO already exists and will not create a duplicate
-        return DaoManager.createDao(connectionSource, Definition.class);
-    }
-
-    public Dao<Word, Long> getWordDao() throws SQLException {
-        return DaoManager.createDao(connectionSource, Word.class);
-    }
-
-    @Override
-    public void close() throws IOException {
+    public static void close() throws IOException {
         DaoManager.clearCache();
         connectionSource.close();
+    }
+    public static void clear() throws SQLException {
+        TableUtils.clearTable(connectionSource, Word.class);
+        TableUtils.clearTable(connectionSource, Definition.class);
     }
 }

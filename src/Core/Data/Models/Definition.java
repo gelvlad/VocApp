@@ -5,16 +5,52 @@ import com.j256.ormlite.table.DatabaseTable;
 
 @DatabaseTable
 public class Definition {
+    /************* Fields *************/
     @DatabaseField(generatedId = true)
-    public long id;
-
+    private long id;
     @DatabaseField
-    public String text;
+    private String text;
     @DatabaseField
-    public String context;
-
+    private String context;
     @DatabaseField(canBeNull = false, foreign = true)
-    public Word word;
-
+    private Word word;
+    /************* Constructors *************/
     public Definition() {}
+    public Definition(String text,String context,Word word){
+        this.text=text;
+        this.context=context;
+        this.word=word;
+    }
+    public Definition(String text,Word word){
+        this.text=text;
+        this.word=word;
+    }
+    /************* Getters *************/
+    public long getId() {
+        return id;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public String getContext() {
+        return context;
+    }
+
+    public Word getWord() {
+        return word;
+    }
+    /************* Setters *************/
+    public void setWord(Word word) {
+        this.word = word;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public void setContext(String context) {
+        this.context = context;
+    }
 }
