@@ -19,16 +19,26 @@ public class Word {
     @DatabaseField
     private int times_succeeded;
     @DatabaseField
+    private boolean ignored;
+    @DatabaseField
     private long date_added;
     /************* Constructors *************/
     public Word() {
-        date_added = LocalDate.now().toEpochDay();
+        this("", 0, 0, 0);
     }
+
+    //for testing purposes
+    public Word(String word, int mark) {
+        this(word, mark, 0, 0);
+    }
+
     public Word(String word,int mark,int times_tested, int times_succeeded){
         this.word=word;
         this.mark=mark;
         this.times_succeeded=times_succeeded;
         this.times_tested=times_tested;
+        ignored=false;
+        date_added = LocalDate.now().toEpochDay();
     }
     /************* Getters *************/
     public long getId() {
@@ -46,10 +56,16 @@ public class Word {
     public int getTimes_tested() {
         return times_tested;
     }
+    public boolean isIgnored() {
+        return ignored;
+    }
     public long getDate_added() {
         return date_added;
     }
     /************* Setters *************/
+    public void setId(long id) {
+        this.id = id;
+    }
     public void setWord(String word) {
         this.word = word;
     }
@@ -62,5 +78,7 @@ public class Word {
     public void setTimes_succeeded(int times_succeeded) {
         this.times_succeeded = times_succeeded;
     }
-
+    public void setIgnored(boolean ignored) {
+        this.ignored = ignored;
+    }
 }

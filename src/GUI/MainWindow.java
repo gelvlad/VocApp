@@ -1,10 +1,23 @@
 package GUI;
 
+import Core.Data.Access.CustomAccess;
+import Core.Data.Access.CustomWordAccess;
+import Core.Data.Database;
+import Core.Data.Models.Definition;
+import Core.Data.Models.Word;
+import com.j256.ormlite.stmt.QueryBuilder;
+import com.j256.ormlite.stmt.Where;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.Console;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Formatter;
+import java.util.List;
 
 public class MainWindow extends JFrame{
     private static final Dimension dictionarySize=new Dimension(200,300);
@@ -32,6 +45,8 @@ public class MainWindow extends JFrame{
         final WorkWithTextTextArea workWithTextTextArea=new WorkWithTextTextArea();
         final CustomMenuBar customMenuBar=new CustomMenuBar();
 
+        this.dictionaryList = dictionaryList;
+        this.wordInfoLabel = wordInfoLabel;
         // Element preferences
         wordTextField.setPreferredSize(wordSize);
         definitionTextField.setPreferredSize(definitionSize);
@@ -116,14 +131,161 @@ public class MainWindow extends JFrame{
     }
 
     //-----------ELEMENTS-------------
-    private class DictionaryList extends JList{
+    private DictionaryList dictionaryList;
+    private WordInfoLabel wordInfoLabel;
+    private enum SortType {
+        NAME,
+        DATE,
+        MARK
+    }
+    private SortType sortType = SortType.NAME;
+    private SortType getSortType(){
+        return this.sortType;
+    }
+    private void setSortType(SortType value){
+        this.sortType = value;
+        this.dictionaryList.loadListModel();
+    }
+
+    private class DictionaryList extends JList<Word>{
+        private JPopupMenu popupMenu;
+
         DictionaryList(){
             super();
-            final DefaultListModel<String> listModel=new DefaultListModel();
-            for(int i=0;i<50;i++){
-                listModel.addElement("test"+i);
+            this.setCellRenderer(new DictionaryCellRenderer());
+            loadListModel();
+            this.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            this.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    rightClick(e);
+                }
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    rightClick(e);
+                }
+
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2){
+                        Word word = getSelectedValue();
+                        List<Definition> definitionList = null;
+                        try {
+                            Where<Definition, Long> selectWhere = Database.getDefinitionAccess().getDao().queryBuilder()
+                                    .where().eq("word_id", word.getId());
+                            definitionList = selectWhere.query();
+                        }
+                        catch (SQLException exception){
+                            exception.printStackTrace();
+                        }
+
+                        String text = null;
+                        if (definitionList.size() == 1){
+                            Definition definition = definitionList.get(0);
+                            text = "<html>" + word.getWord() + " - " + definition.getText() + ".<br><br>>" +
+                                          definition.getContext();
+                        }
+                        else if (definitionList.size() > 1){
+                            text = "<html>" + word.getWord() + "<br><br>";
+                            for (Definition definition: definitionList){
+                                text += definition.getText() + ": " + definition.getContext() + ".<br><br>";
+                            }
+                        }
+                        if (!definitionList.isEmpty()){
+                            text += "Answered correctly/Times tested: " +
+                                    word.getTimes_succeeded() + "/" +word.getTimes_tested() + "</html>";
+                        }
+                        wordInfoLabel.setText(text);
+                    }
+                }
+            });
+
+            popupMenu = new JPopupMenu();
+            popupMenu.add(new AbstractAction("Ignore") {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    Word value = getSelectedValue();
+                    value.setIgnored(!value.isIgnored());
+                    try {
+                        Database.getWordAccess().update(value);
+                    }
+                    catch (SQLException exception) {
+                        exception.printStackTrace();
+                    }
+                    loadListModel();
+                }
+            });
+            popupMenu.add(new AbstractAction("Delete") {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    Word value = getSelectedValue();
+                    try {
+                        Database.getWordAccess().delete(value);
+                    }
+                    catch (SQLException exception) {
+                        exception.printStackTrace();
+                    }
+                    loadListModel();
+                }
+            });
+        }
+        private void rightClick(MouseEvent e) {
+            if (e.isPopupTrigger()) {
+                this.setSelectedIndex(this.locationToIndex(e.getPoint()));
+                popupMenu.show(this, e.getX(), e.getY());
+            }
+        }
+        private void loadListModel(){
+            CustomAccess<Word, Long> wordAccess = Database.getWordAccess();
+            final DefaultListModel<Word> listModel = new DefaultListModel<>();
+            QueryBuilder<Word, Long> select = wordAccess.getDao().queryBuilder().orderBy("ignored", true);
+            switch (getSortType()) {
+                case NAME:
+                    select = select.orderBy("word", true);
+                    break;
+                case DATE:
+                    select = select.orderBy("date_added", false);
+                    break;
+                case MARK:
+                    select = select.orderBy("mark", false);
+                    break;
+            }
+            try {
+                List<Word> wordList = select.query();
+                for (Word word: wordList) {
+                    listModel.addElement(word);
+                }
+            }
+            catch (SQLException exception){
+                exception.printStackTrace();
+                //do something
             }
             this.setModel(listModel);
+        }
+    }
+    private class DictionaryCellRenderer implements ListCellRenderer<Word> {
+        private DefaultListCellRenderer defaultRenderer = new DefaultListCellRenderer();
+
+        @Override
+        public Component getListCellRendererComponent(JList<? extends Word> list, Word value, int index,
+                                                      boolean isSelected, boolean cellHasFocus) {
+            JLabel renderer = (JLabel)defaultRenderer.getListCellRendererComponent(
+                    list, value.getWord(), index, isSelected, cellHasFocus);
+            if (value.isIgnored())
+                renderer.setBackground(Color.LIGHT_GRAY);
+            else if (value.getMark() > 0) {
+                float[] hsb = new float[3];
+                if (value.getMark() < 5)
+                    Color.RGBtoHSB(255, 153, 153, hsb);
+                else if (value.getMark() < 9)
+                    Color.RGBtoHSB(255, 236, 139, hsb);
+                else
+                    Color.RGBtoHSB(132, 224, 132, hsb);
+                renderer.setBackground(Color.getHSBColor(hsb[0], hsb[1], hsb[2]));
+            }
+            if (isSelected)
+                renderer.setBackground(getBackground().darker());
+            return renderer;
         }
     }
     private class WordInfoLabel extends JLabel{
@@ -142,14 +304,17 @@ public class MainWindow extends JFrame{
             final JRadioButtonMenuItem menuItem1=
                     new JRadioButtonMenuItem(new AbstractAction("Alphabetic order") {
                 public void actionPerformed(ActionEvent e) {
+                    setSortType(SortType.NAME);
                 }
             });
             final JRadioButtonMenuItem menuItem2=new JRadioButtonMenuItem(new AbstractAction("By date added") {
                 public void actionPerformed(ActionEvent e) {
+                    setSortType(SortType.DATE);
                 }
             });
             final JRadioButtonMenuItem menuItem3=new JRadioButtonMenuItem(new AbstractAction("By marker") {
                 public void actionPerformed(ActionEvent e) {
+                    setSortType(SortType.MARK);
                 }
             });
 
